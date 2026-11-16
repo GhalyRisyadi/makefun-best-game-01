@@ -1,79 +1,97 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
+import { UPGRADES } from './config.js';
+import { setWaveForShot, startRun } from './world.js';
 
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
-    }
-  }
-  return Infinity;
+function preparePlay(world) {
+  setWaveForShot(world, 4);
+  const state = world.state;
+  state.time = 12.4;
+  state.score = 4820;
+  state.kills = 24;
+  state.health = 4;
+  state.maxHealth = 6;
+  state.light = 2;
+  state.maxLight = 6;
+  state.pendingSpawns = 0;
+  state.spawnTimer = 30;
+  state.player.x = 630;
+  state.player.y = 501;
+  state.pulseFlash = 0.3;
+  state.pulseCooldown = 3.8;
+  state.enemies = [
+    { type: 'guardian', x: 862, y: 278, hp: 22, maxHp: 38, radius: 52, color: '#ff829d', age: 2.1, cooldown: 0.4 },
+    { type: 'moth', x: 430, y: 349, hp: 2, maxHp: 3, radius: 18, color: '#ffc978', age: 1.4, cooldown: 1.2 },
+    { type: 'bramble', x: 767, y: 494, hp: 4, maxHp: 4, radius: 21, color: '#c897ff', age: 0.7, cooldown: 0.2, chargeTime: 0.4, angle: -2.7 },
+    { type: 'wisp', x: 514, y: 269, hp: 2, maxHp: 2, radius: 16, color: '#ff829d', age: 0.8, cooldown: 0 },
+  ];
+  state.hazards = [
+    { x: 688, y: 411, vx: -51, vy: 172, life: 3, radius: 8, color: '#ff92b0' },
+    { x: 947, y: 330, vx: -170, vy: 42, life: 3, radius: 7, color: '#ffd594' },
+  ];
+  state.shots = [
+    { x: 701, y: 442, vx: 471, vy: -449, life: 0.6, damage: 1, color: '#fff2bf' },
+    { x: 671, y: 470, vx: 522, vy: -384, life: 0.4, damage: 1, color: '#fff2bf' },
+  ];
+  state.motes = [
+    { x: 579, y: 383, age: 0.3, phase: 0.4, value: 1 },
+    { x: 359, y: 539, age: 1.1, phase: 2.2, value: 1 },
+  ];
+  state.sparks = [
+    { x: 790, y: 387, vx: 40, vy: -58, life: 0.5, maxLife: 0.6, color: '#ffc978', size: 3 },
+    { x: 782, y: 395, vx: -45, vy: 32, life: 0.4, maxLife: 0.6, color: '#c4ffe1', size: 2.5 },
+  ];
 }
 
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
+export function prepareShot(world, name) {
+  if (name === 'title') return 'title';
+  if (name === 'play') {
+    preparePlay(world);
+    return 'play';
   }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
+  if (name === 'choice') {
+    startRun(world);
+    const state = world.state;
+    state.time = 8.2;
+    state.wave = 2;
+    state.score = 1640;
+    state.kills = 11;
+    state.health = 4;
+    state.maxHealth = 6;
+    state.light = 2;
+    state.maxLight = 6;
+    state.player.x = 1090;
+    state.player.y = 596;
+    state.inChoice = true;
+    state.pendingSpawns = 0;
+    state.enemies = [];
+    state.choices = [
+      UPGRADES.find((upgrade) => upgrade.id === 'wick'),
+      UPGRADES.find((upgrade) => upgrade.id === 'wide'),
+      UPGRADES.find((upgrade) => upgrade.id === 'heart'),
+    ];
+    return 'choice';
   }
-  return best;
-}
-
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
+  if (name === 'win') {
+    startRun(world);
+    const state = world.state;
+    state.time = 38.6;
+    state.wave = 4;
+    state.score = 9280;
+    state.kills = 36;
+    state.health = 3;
+    state.maxHealth = 6;
+    state.light = 1;
+    state.maxLight = 6;
+    state.player.x = 1090;
+    state.player.y = 596;
+    state.upgrades = ['wick', 'wide', 'bright'];
+    state.enemies = [];
+    state.hazards = [];
+    state.shots = [];
+    state.motes = [];
+    state.sparks = [];
+    state.pendingSpawns = 0;
+    state.completed = true;
+    return 'win';
   }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+  return null;
 }

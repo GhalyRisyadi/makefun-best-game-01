@@ -1,53 +1,87 @@
-// Keyboard and pointer input. Held keys give a steering direction; one-shot presses (start or
-// restart, pause) are queued as bit flags and taken once by the loop, so a press between two
-// frames is never lost and never counted twice.
+import { FIELD } from './config.js';
 
-export const ACTION_CONFIRM = 1;
-export const ACTION_PAUSE = 2;
+const HELD_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowLeft', 'ArrowDown', 'ArrowRight']);
 
-const LEFT = new Set(['ArrowLeft', 'KeyA']);
-const RIGHT = new Set(['ArrowRight', 'KeyD']);
-const CONFIRM = new Set(['Space', 'Enter']);
-const PAUSE = new Set(['KeyP', 'Escape']);
+export function createInput(canvas) {
+  const keys = new Set();
+  const pointer = { x: FIELD.width / 2, y: FIELD.height / 2, down: false, pressed: false, pulse: false };
 
-export function createInput(target) {
-  let left = false;
-  let right = false;
-  let actions = 0;
+  function locate(event) {
+    const rect = canvas.getBoundingClientRect();
+    const scale = Math.min(rect.width / FIELD.width, rect.height / FIELD.height);
+    const offsetX = (rect.width - FIELD.width * scale) / 2;
+    const offsetY = (rect.height - FIELD.height * scale) / 2;
+    pointer.x = (event.clientX - rect.left - offsetX) / scale;
+    pointer.y = (event.clientY - rect.top - offsetY) / scale;
+  }
 
   window.addEventListener('keydown', (event) => {
-    if (LEFT.has(event.code)) left = true;
-    else if (RIGHT.has(event.code)) right = true;
-    else if (CONFIRM.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_CONFIRM;
-    } else if (PAUSE.has(event.code)) {
-      if (!event.repeat) actions |= ACTION_PAUSE;
-    } else return;
-    event.preventDefault();
+    if (HELD_KEYS.has(event.code) || event.code === 'Space') event.preventDefault();
+    if (!event.repeat) keys.add(event.code);
   });
-  window.addEventListener('keyup', (event) => {
-    if (LEFT.has(event.code)) left = false;
-    else if (RIGHT.has(event.code)) right = false;
+  window.addEventListener('keyup', (event) => keys.delete(event.code));
+  window.addEventListener('blur', () => keys.clear());
+  canvas.addEventListener('pointermove', locate);
+  canvas.addEventListener('pointerdown', (event) => {
+    locate(event);
+    canvas.setPointerCapture(event.pointerId);
+    if (event.button === 2) pointer.pulse = true;
+    else {
+      pointer.down = true;
+      pointer.pressed = true;
+    }
   });
-  // A key released while the tab is hidden never sends keyup: let go of everything on blur.
-  window.addEventListener('blur', () => {
-    left = false;
-    right = false;
+  canvas.addEventListener('pointerup', (event) => {
+    if (event.button !== 2) pointer.down = false;
   });
-  target.addEventListener('pointerdown', () => {
-    actions |= ACTION_CONFIRM;
-  });
+  canvas.addEventListener('contextmenu', (event) => event.preventDefault());
 
   return {
-    /** -1 for left, 1 for right, 0 for neither or both. */
-    direction() {
-      return (right ? 1 : 0) - (left ? 1 : 0);
+    movement() {
+      return {
+        x: Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft')),
+        y: Number(keys.has('KeyS') || keys.has('ArrowDown')) - Number(keys.has('KeyW') || keys.has('ArrowUp')),
+      };
     },
-    /** The one-shot presses since the last call, as ACTION_* flags. */
-    takeActions() {
-      const taken = actions;
-      actions = 0;
-      return taken;
+    aim: pointer,
+    isFiring: () => pointer.down,
+    takePress: () => {
+      const pressed = pointer.pressed;
+      pointer.pressed = false;
+      return pressed;
+    },
+    takePulse: () => {
+      const pulse = pointer.pulse || keys.has('Space') || keys.has('ShiftLeft') || keys.has('ShiftRight');
+      pointer.pulse = false;
+      if (keys.has('Space')) keys.delete('Space');
+      if (keys.has('ShiftLeft')) keys.delete('ShiftLeft');
+      if (keys.has('ShiftRight')) keys.delete('ShiftRight');
+      return pulse;
+    },
+    takeConfirm: () => {
+      if (!keys.has('Enter')) return false;
+      keys.delete('Enter');
+      return true;
+    },
+    takePause: () => {
+      if (!keys.has('Escape') && !keys.has('KeyP')) return false;
+      keys.delete('Escape');
+      keys.delete('KeyP');
+      return true;
+    },
+    takeMute: () => {
+      if (!keys.has('KeyM')) return false;
+      keys.delete('KeyM');
+      return true;
+    },
+    pressedNumber: () => {
+      for (let index = 0; index < 3; index += 1) {
+        if (keys.has(`Digit${index + 1}`)) {
+          keys.delete(`Digit${index + 1}`);
+          return index;
+        }
+      }
+      return -1;
     },
   };
 }

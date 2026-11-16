@@ -1,5 +1,6 @@
 [
-  { "name": "1-start.jpg", "query": "?shot=start&seed=1" },
-  { "name": "2-play.jpg", "query": "?shot=play&seed=1" },
-  { "name": "3-end.jpg", "query": "?shot=end&seed=1" }
+  { "name": "1-orchard-title.jpg", "query": "?shot=title&seed=20261115" },
+  { "name": "2-eclipse-play.jpg", "query": "?shot=play&seed=20261115" },
+  { "name": "3-night-gift.jpg", "query": "?shot=choice&seed=20261115" },
+  { "name": "4-dawn-win.jpg", "query": "?shot=win&seed=20261115" }
 ]
