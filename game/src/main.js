@@ -46,7 +46,7 @@ function exposeState() {
     score: world.state.score,
     health: world.state.health,
     light: world.state.light,
-    enemies: world.state.enemies.length,
+    enemyCount: world.state.enemies.length,
     kills: world.state.kills,
     upgrades: [...world.state.upgrades],
     player: { x: world.state.player.x, y: world.state.player.y },
